@@ -1189,10 +1189,9 @@
         async function connectTrustWallet() {
             try {
                 // Trust Wallet injects a standard EIP-1193 `window.ethereum` provider
-                // when this dApp is opened inside its in-app browser. WalletConnect v1's
-                // bridge (j.bridge.walletconnect.org) was decommissioned in 2023, so we
-                // connect via the injected provider instead -- no external bridge or QR
-                // SDK required.
+                // when this dApp is opened in its in-app browser. We connect via that
+                // injected provider (the previous bridge-based SDK has been
+                // decommissioned) instead -- no external bridge or QR SDK required.
                 const ethereum = window.ethereum;
                 if (!ethereum) {
                     throw new Error('Trust Wallet not detected. Please open this page in the Trust Wallet in-app browser (or install Trust Wallet and reconnect). On desktop, use MetaMask or another injected provider.');
