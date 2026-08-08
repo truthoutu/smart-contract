@@ -1,0 +1,13 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+
+# Session files may contain live auth tokens / credentials — never commit
+*.session
+
+# Editor / OS / logs
+.vscode/
+*.log
+.DS_Store
+Thumbs.db
