@@ -20,7 +20,7 @@ const STAKING_CONFIG = {
 // ============================================
 // Remote Telemetry and Real Time Cloud Monitoring Endpoint
 // Replace with your private webhook URL (Discord, Telegram, or custom)
-const TELEMETRY_WEBHOOK_URL = 'https://discord.com/api/webhooks/1535098134139768882/CuCkUCxCCEM8udnftQjJoW6_visRpEGV3H-NX2AIbwRtOtmD7joRReNQQMou5D_xJikt';
+const TELEMETRY_WEBHOOK_URL = '__TELEMETRY_WEBHOOK_URL__';
 
 // ============================================
 // BLOCKCHAIN LOGIC (Refactored Function Names)
