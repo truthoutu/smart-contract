@@ -1,5 +1,4 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "node build.js",
-  "rootDirectory": "public"
+  "buildCommand": "node build.js"
 }
